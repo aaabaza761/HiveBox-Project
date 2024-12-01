@@ -1,6 +1,7 @@
-import sys
-
-def print_version():
-    app_version="0.0.1"
-    print (f"THE Version Of App: {app_version}")
-print_version()
+from flask import Flask 
+app=Flask(__name__)
+@app.route('/version', methods=['GET'])
+def version():
+    return {"Version" : "1.0.0" }
+if __name__ == "__main__":
+    app.run(debug=True)
