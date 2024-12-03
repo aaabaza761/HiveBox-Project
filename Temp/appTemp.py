@@ -1,6 +1,6 @@
 import requests
 from flask import Flask, jsonify
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 app = Flask(__name__)
 
@@ -16,41 +16,29 @@ def get_temperature_data():
 
 # Function to filter and calculate the average temperature
 def calculate_average_temperature(data):
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     valid_temperatures = []
 
     for box in data:
-        # Loop through each sensor to find temperature readings
         for sensor in box.get('sensors', []):
-            # Check if 'title' exists in the sensor and if it matches 'Temperatur'
             if 'title' in sensor and sensor['title'] == 'Temperatur':
-                # Get the timestamp of the last measurement
                 last_measurement_at = sensor.get('lastMeasurementAt')
                 if last_measurement_at:
                     try:
-                        last_measurement_time = datetime.strptime(last_measurement_at, '%Y-%m-%dT%H:%M:%S.%fZ')
+                        last_measurement_time = datetime.strptime(last_measurement_at, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=timezone.utc)
                     except Exception as e:
                         print(f"Error parsing lastMeasurementAt: {e}")
                         continue
-                    
-                    # If the measurement is within the last 1 hour, consider it
+
                     if now - last_measurement_time <= timedelta(hours=1):
-                        # We assume the temperature value is stored in 'lastMeasurement' for this example
-                        # Adjust based on actual response or API
-                        temperature = sensor.get('lastMeasurement')  # Replace this if temperature is in another field
+                        temperature = sensor.get('lastMeasurement')
                         if temperature:
-                            valid_temperatures.append(float(temperature))  # Convert to float for averaging
-                        else:
-                            print(f"Missing temperature value for sensor {sensor['_id']}")
+                            valid_temperatures.append(float(temperature))
                     else:
-                        print(f"Skipping sensor {sensor['_id']} - Measurement older than 1 hour.")
+                        print(f"Skipping sensor {sensor.get('_id', 'unknown')} - Measurement older than 1 hour.")
                 else:
-                    print(f"No lastMeasurementAt for sensor {sensor['_id']}")
-    
-    # Log the number of valid temperatures found
-    print(f"Found {len(valid_temperatures)} valid temperature readings in the last hour.")
-    #return data 
-    # Calculate the average temperature
+                    print(f"No lastMeasurementAt for sensor {sensor.get('_id', 'unknown')}")
+
     if valid_temperatures:
         return sum(valid_temperatures) / len(valid_temperatures)
     return None
