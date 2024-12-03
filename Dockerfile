@@ -1,4 +1,9 @@
-FROM python:latest
+FROM python:3.11 AS builder
 WORKDIR /app
-COPY /appVersion .
-CMD [ "python","appVersion" ]ح
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+COPY appVersion.py .
+FROM python:3.11-slim 
+WORKDIR /app
+COPY --from=builder /app . 
+CMD [ "python","appVersion" ]

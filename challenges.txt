@@ -1,0 +1,6 @@
+1- I donot learn flask so i searched about how to use it and i completely first endpoint(/version) then run on local server
+2- I containerlized the first endpoint(/version) but i faced some issues in the path of file nut in the end i finished completely the Dockerfile successfully
+3- When run the flask app in container , i cannot access the app from outside the container on depsite i access the app inside the container successfully
+firstly, i think that the issue donot map the running container port with localhost port through ( docker run -p localhost_port:container_port appvesion)
+but appear the same issue so i seearched and reached that must identify flask to hosted on all ip throush ( falask run,"0.0.0.0")
+after i do this , i access the flask app container from outside successfully
