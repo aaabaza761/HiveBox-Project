@@ -4,7 +4,6 @@ This module defines a Flask application that serves the average temperature from
 
 from datetime import datetime, timedelta, timezone
 import requests
-# pylint: disable=import-error
 from flask import Flask, jsonify
 
 app = Flask(__name__)
@@ -49,9 +48,11 @@ def calculate_average_temperature(data):
                 continue
 
             if now - last_measurement_time > timedelta(hours=1):
-                print(f"Skipping sensor {sensor.get('_id', 'unknown')} 
-                      - Measurement older than 1 hour."
-                      )
+                print(
+                    f"Skipping sensor {sensor.get('_id', 'unknown')} - "
+                    "Measurement older than 1 hour."
+                )
+
                 continue
 
             temperature = sensor.get('lastMeasurement')
@@ -72,9 +73,7 @@ def get_temperature():
         return jsonify({"error": "Unable to fetch data from openSenseMap"}), 500
     average_temperature = calculate_average_temperature(data)
     if average_temperature is None:
-        return jsonify(
-            {"error": "No valid temperature data available in the last hour"}
-            ), 404
+        return jsonify({"error": "No valid temperature data available in the last hour"}), 404
 
     return jsonify({"average_temperature": average_temperature})
 
