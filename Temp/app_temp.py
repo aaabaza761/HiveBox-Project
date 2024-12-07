@@ -4,6 +4,7 @@ This module defines a Flask application that serves the average temperature from
 
 from datetime import datetime, timedelta, timezone
 import requests
+# pylint: disable=import-error
 from flask import Flask, jsonify
 
 app = Flask(__name__)
