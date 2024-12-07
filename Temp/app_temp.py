@@ -4,6 +4,7 @@ This module defines a Flask application that serves the average temperature from
 
 from datetime import datetime, timedelta, timezone
 import requests
+# pylint: disable=import-error
 from flask import Flask, jsonify
 
 app = Flask(__name__)
@@ -48,9 +49,9 @@ def calculate_average_temperature(data):
                 continue
 
             if now - last_measurement_time > timedelta(hours=1):
-                print(
-                    f"Skipping sensor{sensor.get('_id', 'unknown')}-Measurement older than 1 hour."
-                    )
+                print(f"Skipping sensor {sensor.get('_id', 'unknown')} 
+                      - Measurement older than 1 hour."
+                      )
                 continue
 
             temperature = sensor.get('lastMeasurement')
