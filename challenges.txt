@@ -4,3 +4,6 @@
 firstly, i think that the issue donot map the running container port with localhost port through ( docker run -p localhost_port:container_port appvesion)
 but appear the same issue so i seearched and reached that must identify flask to hosted on all ip throush ( falask run,"0.0.0.0")
 after i do this , i access the flask app container from outside successfully
+4- i face some problems to get temperature from OpenSenseMap API and i tried to debug it 
+5- faced some issues in writting unittest to check all cases 
+6- during ci workflow , appear some issues when using pylint to check quality of code , tried depug file ny file and i could do it .  
