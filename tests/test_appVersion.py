@@ -1,5 +1,5 @@
 import unittest
-from appVersion import app
+from Version.appVersion import app
 class TestAppVerion(unittest.TestCase):
     def setUp(self):
         self.app = app.test_client()
