@@ -27,3 +27,10 @@ jobs:
       - name: lint Dockerfile in temp
         run: hadolint Temp/Dockerfile
 
+      - name: install pylint
+        run: pip install pylint
+
+      - name: use pylint to check code
+        run: pylint Version/*.py Temp/*.py tests/*.py 
+      
+        
