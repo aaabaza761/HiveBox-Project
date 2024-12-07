@@ -1,4 +1,4 @@
-name: ci pipeline
+name: CI Pipeline
 on:
   push:
     branches:
@@ -11,26 +11,32 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      #check out 
-      - name: checkout code
+      # Checkout code
+      - name: Checkout code
         uses: actions/checkout@v3
       
-      - name: install Hadolint 
+      # Install Hadolint
+      - name: Install Hadolint
         run: |
           wget -O hadolint https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64
           chmod +x hadolint
           sudo mv hadolint /usr/local/bin/hadolint
-     
-      - name: lint Dockerfile in Version
+
+      # Lint Dockerfiles
+      - name: Lint Dockerfile in Version
         run: hadolint Version/Dockerfile
 
-      - name: lint Dockerfile in temp
+      - name: Lint Dockerfile in Temp
         run: hadolint Temp/Dockerfile
 
-      - name: install pylint
+      # Install pylint
+      - name: Install pylint
         run: pip install pylint
 
-      - name: use pylint to check code
+      # Set PYTHONPATH and Run pylint
+      - name: Use pylint to check code
+        env:
+          PYTHONPATH: ${{ github.workspace }}
         run: pylint Version/*.py Temp/*.py tests/*.py
-      
+
         
