@@ -102,3 +102,20 @@ jobs:
         run: |
             docker build -t ${{ secrets.DOCKER_USERNAME }}/apptemp:latest Temp/
             docker push ${{ secrets.DOCKER_USERNAME }}/apptemp:latest
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout of code
+        uses: actions/checkout@v3
+
+      - name: run Openssf Scorecard
+        uses: ossf/scorecard-action@v2
+        with:
+          results_file: results.json
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v3
+        with:
+          name: Scorecard results
+          paths: results.json
