@@ -95,10 +95,10 @@ jobs:
       # Build and Push Docker Image for version 
       - name: Build and Push Docker Image
         run: |
-            docker build -t myapp/version:latest Version/
-            docker push myapp/version:latest
-      # Build and Push Docker Image for version 
+            docker build -t ${{ secrets.DOCKER_USERNAME }}/appversion:latest Version/
+            docker push ${{ secrets.DOCKER_USERNAME }}/appversion:latest
+      # Build and Push Docker Image for temp
       - name: Build and Push Docker Image
         run: |
-            docker build -t myapp/temp:latest Temp/
-            docker push myapp/temp:latest
+            docker build -t ${{ secrets.DOCKER_USERNAME }}/apptemp:latest Temp/
+            docker push ${{ secrets.DOCKER_USERNAME }}/apptemp:latest
