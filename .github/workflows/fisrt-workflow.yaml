@@ -96,9 +96,9 @@ jobs:
       - name: Build and Push Docker Image
         run: |
             docker build -t myapp/version:latest Version/
-            docker push myapp/image:latest
+            docker push myapp/version:latest
       # Build and Push Docker Image for version 
       - name: Build and Push Docker Image
         run: |
             docker build -t myapp/temp:latest Temp/
-            docker push myapp/image:latest
+            docker push myapp/temp:latest
