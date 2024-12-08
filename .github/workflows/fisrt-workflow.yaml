@@ -38,5 +38,29 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}
         run: pylint Version/*.py Temp/*.py tests/*.py || exit 0
-
+  
+  test:
+    runs-on: ubuntu-latest
+      
+    steps:
+      # Check out the repository code
+      - name: Checkout code
+        uses: actions/checkout@v3
+      
+      # Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.12
+      
+    # Install dependencies
+      - name: Install dependencies
+        run: |
+             pip install -r Version/requirements.txt
+             
+      
+      # Run tests
+      - name: Run unit tests
+        run: python -m unittest discover -s tests -p "test_*.py"
+      
         
