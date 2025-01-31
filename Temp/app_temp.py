@@ -1,22 +1,24 @@
 """
-This module defines a Flask application that serves the average temperature from the last hour.
+Flask application to serve temperature data with Prometheus metrics.
 """
 
 from datetime import datetime, timedelta, timezone
 import requests
-# pylint: disable=import-error
 from flask import Flask, jsonify
+from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
 app = Flask(__name__)
 
-# openSenseMap API URL
+# OpenSenseMap API URL
 SENSEBOX_API_URL = "https://api.opensensemap.org/boxes"
+
+# Prometheus Metrics
+REQUEST_COUNT = Counter('temperature_requests_total', 'Total number of temperature requests')
+TEMPERATURE_GAUGE = Gauge('average_temperature', 'Average temperature over the last hour')
 
 def get_temperature_data():
     """
     Fetches temperature data from the openSenseMap API.
-    Returns:
-        list: A list of senseBox data if the API call is successful, otherwise an empty list.
     """
     response = requests.get(SENSEBOX_API_URL, timeout=10)
     if response.status_code == 200:
@@ -37,23 +39,16 @@ def calculate_average_temperature(data):
 
             last_measurement_at = sensor.get('lastMeasurementAt')
             if not last_measurement_at:
-                print(f"No lastMeasurementAt for sensor {sensor.get('_id', 'unknown')}")
                 continue
 
             try:
                 last_measurement_time = datetime.strptime(
                     last_measurement_at, '%Y-%m-%dT%H:%M:%S.%fZ'
                 ).replace(tzinfo=timezone.utc)
-            except ValueError as e:
-                print(f"Error parsing lastMeasurementAt: {e}")
+            except ValueError:
                 continue
 
             if now - last_measurement_time > timedelta(hours=1):
-                print(
-                    f"Skipping sensor {sensor.get('_id', 'unknown')} - "
-                    "Measurement older than 1 hour."
-                )
-
                 continue
 
             temperature = sensor.get('lastMeasurement')
@@ -64,19 +59,44 @@ def calculate_average_temperature(data):
         return sum(valid_temperatures) / len(valid_temperatures)
     return None
 
-@app.route('/temp', methods=['GET'])
+def determine_status(temperature):
+    """
+    Determines the status based on the temperature.
+    """
+    if temperature < 10:
+        return "Too Cold"
+    elif 11 <= temperature <= 36:
+        return "Good"
+    else:
+        return "Too Hot"
+
+@app.route('/temperature', methods=['GET'])
 def get_temperature():
     """
-    Handles the /temp endpoint and returns the average temperature for the last hour.
+    Handles the /temperature endpoint and returns the average temperature with status.
     """
+    REQUEST_COUNT.inc()  # Increment request count metric
     data = get_temperature_data()
     if not data:
         return jsonify({"error": "Unable to fetch data from openSenseMap"}), 500
+
     average_temperature = calculate_average_temperature(data)
     if average_temperature is None:
         return jsonify({"error": "No valid temperature data available in the last hour"}), 404
 
-    return jsonify({"average_temperature": average_temperature})
+    TEMPERATURE_GAUGE.set(average_temperature)  # Update Prometheus metric
+
+    return jsonify({
+        "average_temperature": average_temperature,
+        "status": determine_status(average_temperature)
+    })
+
+@app.route('/metrics', methods=['GET'])
+def metrics():
+    """
+    Exposes Prometheus metrics.
+    """
+    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
 
 if __name__ == '__main__':
     app.run(debug=True)
