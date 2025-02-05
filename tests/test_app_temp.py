@@ -1,8 +1,3 @@
-"""
-Unit tests for the app_temp Flask application.
-Tests the functionality of temperature data processing and API endpoints.
-"""
-
 import unittest
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta, timezone
@@ -52,16 +47,14 @@ class TestTemperatureAPI(unittest.TestCase):
                         "_id": "sensor1",
                         "title": "Temperatur",
                         "lastMeasurementAt": (
-                                    now - timedelta(minutes=30)).strftime('%Y-%m-%dT%H:%M:%S.%fZ'
-                                            ),
+                            now - timedelta(minutes=30)).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                         "lastMeasurement": "22.5",
                     },
                     {
                         "_id": "sensor2",
                         "title": "Temperatur",
                         "lastMeasurementAt": (
-                            now - timedelta(minutes=90)).strftime('%Y-%m-%dT%H:%M:%S.%fZ'
-                                            ),
+                            now - timedelta(minutes=90)).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                         "lastMeasurement": "20.0",
                     },
                 ]
@@ -83,8 +76,7 @@ class TestTemperatureAPI(unittest.TestCase):
                         "_id": "sensor1",
                         "title": "Temperatur",
                         "lastMeasurementAt": (
-                            now - timedelta(hours=2)).strftime('%Y-%m-%dT%H:%M:%S.%fZ'
-                                            ),
+                            now - timedelta(hours=2)).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                         "lastMeasurement": "22.5",
                     }
                 ]
@@ -107,15 +99,14 @@ class TestTemperatureAPI(unittest.TestCase):
                         "_id": "sensor1",
                         "title": "Temperatur",
                         "lastMeasurementAt": (
-                            now - timedelta(minutes=30)).strftime('%Y-%m-%dT%H:%M:%S.%fZ'
-                                            ),
+                            now - timedelta(minutes=30)).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                         "lastMeasurement": "22.5",
                     }
                 ]
             }
         ]
         with app.test_client() as client:
-            response = client.get('/temp')
+            response = client.get('/temperature')
             self.assertEqual(response.status_code, 200)
             self.assertIn("average_temperature", response.get_json())
 
@@ -127,7 +118,7 @@ class TestTemperatureAPI(unittest.TestCase):
         """
         mock_get_temperature_data.return_value = []
         with app.test_client() as client:
-            response = client.get('/temp')
+            response = client.get('/temperature')
             self.assertEqual(response.status_code, 500)
             self.assertIn("error", response.get_json())
 
@@ -145,16 +136,16 @@ class TestTemperatureAPI(unittest.TestCase):
                         "_id": "sensor1",
                         "title": "Temperatur",
                         "lastMeasurementAt": (
-                            now - timedelta(hours=2)).strftime('%Y-%m-%dT%H:%M:%S.%fZ'
-                                                               ),
+                            now - timedelta(hours=2)).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
                         "lastMeasurement": "22.5",
                     }
                 ]
             }
         ]
         with app.test_client() as client:
-            response = client.get('/temp')
-            self.assertEqual(response.status_code, 404)
+            response = client.get('/temperature')
+            # التغيير هنا إلى 404 بدل 200
+            self.assertEqual(response.status_code, 404)  # يجب أن يكون 404 في حالة بيانات غير صالحة
             self.assertIn("error", response.get_json())
 
 

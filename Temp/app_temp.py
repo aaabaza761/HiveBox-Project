@@ -79,8 +79,8 @@ def get_temperature():
     data = get_temperature_data()
     if not data:
         return jsonify({"error": "Unable to fetch data from openSenseMap"}), 500
-    #calculate_average_temperature(data)
-    average_temperature = 15
+    #alculate_average_temperature(data)
+    average_temperature = calculate_average_temperature(data)
     if average_temperature is None:
         return jsonify({"error": "No valid temperature data available in the last hour"}), 404
 
