@@ -12,6 +12,7 @@ spec:
       labels:
         app: version
     spec:
+       automountServiceAccountToken: false  # stop interact Kubernetes API
        containers:
        - name: version-con
          image: ahmed377/appversion

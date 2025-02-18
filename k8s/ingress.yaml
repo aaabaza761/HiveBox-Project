@@ -7,24 +7,24 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: app.local
+  - host: application.local
     http:
       paths:
-      - path: /temperature
+      - path: /t
         pathType: Prefix
         backend:
          service:
            name: app-service
            port:
              number: 5000
-      - path: /version
+      - path: /v
         pathType: Prefix
         backend:
          service:
            name: version-service
            port:
              number: 5001
-      - path: /metrics
+      - path: /m
         pathType: Prefix
         backend:
          service:

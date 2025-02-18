@@ -1,9 +1,11 @@
 """
-Flask application to serve temperature data with Prometheus metrics.
+Flask application to serve temperature data with Prometheus metrics and Valkey caching.
 """
 
 from datetime import datetime, timedelta, timezone
 import requests
+import json
+import redis
 from flask import Flask, jsonify
 from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
@@ -12,18 +14,35 @@ app = Flask(__name__)
 # OpenSenseMap API URL
 SENSEBOX_API_URL = "https://api.opensensemap.org/boxes"
 
+# Connect to Valkey (running in the Kubernetes cluster)
+valkey_client = redis.Redis(host="valkey-service", port=6379, decode_responses=True)
+
 # Prometheus Metrics
 REQUEST_COUNT = Counter('temperature_requests_total', 'Total number of temperature requests')
 TEMPERATURE_GAUGE = Gauge('average_temperature', 'Average temperature over the last hour')
 
 def get_temperature_data():
     """
-    Fetches temperature data from the openSenseMap API.
+    Fetches temperature data from the openSenseMap API, with caching in Valkey.
     """
+    cache_key = "temperature_data"
+    
+    # Check if data is in Valkey cache
+    cached_data = valkey_client.get(cache_key)
+    if cached_data:
+        return json.loads(cached_data)  # Return cached data
+
+    # If no data in cache, fetch from API
     response = requests.get(SENSEBOX_API_URL, timeout=30)
     if response.status_code == 200:
-        return response.json()
-    return []
+        data = response.json()
+        valkey_client.setex(cache_key, 300, json.dumps(data))  # Store in Valkey for 300 seconds
+        return data
+    
+    # If there was an error fetching data, store a default value
+    default_data = {'temperature': 50.0}
+    valkey_client.setex(cache_key, 300, json.dumps(default_data))  # Store default value in Valkey
+    return default_data
 
 def calculate_average_temperature(data):
     """
@@ -77,12 +96,14 @@ def get_temperature():
     """
     REQUEST_COUNT.inc()  # Increment request count metric
     data = get_temperature_data()
-    if not data:
-        return jsonify({"error": "Unable to fetch data from openSenseMap"}), 500
-    #alculate_average_temperature(data)
+    
     average_temperature = calculate_average_temperature(data)
+    
     if average_temperature is None:
-        return jsonify({"error": "No valid temperature data available in the last hour"}), 404
+        # Set the default value 50.0 in Redis if no valid temperature is found
+        default_temperature = 50.0
+        valkey_client.setex("temperature_data", 300, json.dumps({"temperature": default_temperature}))
+        average_temperature = default_temperature  # Use the default value
 
     TEMPERATURE_GAUGE.set(average_temperature)  # Update Prometheus metric
 
