@@ -30,8 +30,10 @@ def get_temperature_data():
     # Check if data is in Valkey cache
     cached_data = valkey_client.get(cache_key)
     if cached_data:
-        return json.loads(cached_data)  # Return cached data
-
+        try:
+            return float(cached_data)  # لو رقم، رجعه مباشرة
+        except ValueError:
+            return json.loads(cached_data)  # لو JSON، حمّله
     # If no data in cache, fetch from API
     response = requests.get(SENSEBOX_API_URL, timeout=30)
     if response.status_code == 200:
@@ -39,10 +41,10 @@ def get_temperature_data():
         valkey_client.setex(cache_key, 300, json.dumps(data))  # Store in Valkey for 300 seconds
         return data
     
-    # If there was an error fetching data, store a default value
-    default_data = {'temperature': 50.0}
-    valkey_client.setex(cache_key, 300, json.dumps(default_data))  # Store default value in Valkey
-    return default_data
+    # If there was an error fetching data, store a default value (float)
+    default_data = "50.0"
+    valkey_client.setex(cache_key, 300, default_data)  # Store default value in Valkey
+    return float(default_data)
 
 def calculate_average_temperature(data):
     """
@@ -50,7 +52,7 @@ def calculate_average_temperature(data):
     """
     now = datetime.now(timezone.utc)
     valid_temperatures = []
-
+    
     for box in data:
         for sensor in box.get('sensors', []):
             if sensor.get('title') != 'Temperatur':
@@ -96,14 +98,21 @@ def get_temperature():
     """
     REQUEST_COUNT.inc()  # Increment request count metric
     data = get_temperature_data()
-    
+
+    # لو رجعلي float ده معناه إن فيه مشكلة، فبرجعه مباشرة بدون أي معالجة
+    if isinstance(data, (float, int)):
+        TEMPERATURE_GAUGE.set(data)  # Update Prometheus metric
+        return jsonify({
+            "average_temperature": data,
+            "status": determine_status(data)
+        })
+
+    # Otherwise, process the data normally
     average_temperature = calculate_average_temperature(data)
-    
+
+    # Handle case where no valid temperature is found
     if average_temperature is None:
-        # Set the default value 50.0 in Redis if no valid temperature is found
-        default_temperature = 50.0
-        valkey_client.setex("temperature_data", 300, json.dumps({"temperature": default_temperature}))
-        average_temperature = default_temperature  # Use the default value
+        average_temperature = 20.0  # Default value
 
     TEMPERATURE_GAUGE.set(average_temperature)  # Update Prometheus metric
 

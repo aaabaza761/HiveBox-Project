@@ -15,7 +15,7 @@ spec:
        automountServiceAccountToken: false  # stop interact Kubernetes API
        containers:
        - name: app
-         image: ahmed377/apptemp:v1
+         image: ahmed377/apptemp:v4
          ports:
          - containerPort: 5000
 ---
