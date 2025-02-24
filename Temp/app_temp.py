@@ -8,8 +8,12 @@ import json
 import redis
 from flask import Flask, jsonify
 from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
+import boto3
+import time
+import threading
 
 app = Flask(__name__)
+
 
 # OpenSenseMap API URL
 SENSEBOX_API_URL = "https://api.opensensemap.org/boxes"
@@ -20,6 +24,33 @@ valkey_client = redis.Redis(host="valkey-service", port=6379, decode_responses=T
 # Prometheus Metrics
 REQUEST_COUNT = Counter('temperature_requests_total', 'Total number of temperature requests')
 TEMPERATURE_GAUGE = Gauge('average_temperature', 'Average temperature over the last hour')
+
+# MinIO Configuration
+MINIO_ACCESS_KEY = "admin"
+MINIO_SECRET_KEY = "password"
+MINIO_ENDPOINT = "http://minio-service:9000"
+MINIO_BUCKET_NAME = "hivebox-storage"
+
+# Create MinIO client
+minio_client = boto3.client(
+    "s3",
+    endpoint_url=MINIO_ENDPOINT,
+    aws_access_key_id=MINIO_ACCESS_KEY,
+    aws_secret_access_key=MINIO_SECRET_KEY
+)
+
+# Ensure bucket exists
+def ensure_bucket():
+    """
+    Ensures that the required bucket exists in MinIO.
+    """
+    try:
+        minio_client.head_bucket(Bucket=MINIO_BUCKET_NAME)
+    except:
+        minio_client.create_bucket(Bucket=MINIO_BUCKET_NAME)
+
+# Call the function at startup
+ensure_bucket()
 
 def get_temperature_data():
     """
@@ -91,6 +122,38 @@ def determine_status(temperature):
     else:
         return "Too Hot"
 
+def store_data_in_minio():
+    """
+    Fetch temperature data and store it in MinIO.
+    """
+    data = get_temperature_data()  # جلب البيانات من OpenSenseMap أو الكاش
+    if isinstance(data, float):  # في حالة حدوث خطأ أو استرجاع قيمة افتراضية
+        data = {"average_temperature": data}
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    file_name = f"temperature_{timestamp}.json"
+    
+    try:
+        minio_client.put_object(
+            Bucket=MINIO_BUCKET_NAME,
+            Key=file_name,
+            Body=json.dumps(data),
+            ContentType="application/json"
+        )
+        print(f"✅ Data stored in MinIO: {file_name}")
+    except Exception as e:
+        print(f"❌ Error storing data in MinIO: {e}")
+
+# Auto-save data every 5 minutes
+def periodic_store():
+    while True:
+        store_data_in_minio()
+        time.sleep(300)  # كل 5 دقائق
+
+# تشغيل التخزين التلقائي في thread منفصل
+
+threading.Thread(target=periodic_store, daemon=True).start()
+
 @app.route('/temperature', methods=['GET'])
 def get_temperature():
     """
@@ -127,6 +190,14 @@ def metrics():
     Exposes Prometheus metrics.
     """
     return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+
+@app.route('/store', methods=['POST'])
+def store_data_now():
+    """
+    API endpoint to manually store temperature data in MinIO.
+    """
+    store_data_in_minio()
+    return jsonify({"message": "Data stored successfully in MinIO!"}), 200
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
