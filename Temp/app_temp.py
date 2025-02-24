@@ -14,7 +14,6 @@ import threading
 
 app = Flask(__name__)
 
-
 # OpenSenseMap API URL
 SENSEBOX_API_URL = "https://api.opensensemap.org/boxes"
 
@@ -24,6 +23,13 @@ valkey_client = redis.Redis(host="valkey-service", port=6379, decode_responses=T
 # Prometheus Metrics
 REQUEST_COUNT = Counter('temperature_requests_total', 'Total number of temperature requests')
 TEMPERATURE_GAUGE = Gauge('average_temperature', 'Average temperature over the last hour')
+
+# New Metrics
+STORE_REQUESTS_TOTAL = Counter('store_requests_total', 'Total number of store requests')
+CACHE_HIT_RATIO = Gauge('cache_hit_ratio', 'Ratio of cache hits to total requests')
+STORE_LAST_SUCCESS_TIMESTAMP = Gauge(
+    'store_last_success_timestamp', 'Timestamp of last successful store in MinIO'
+)
 
 # MinIO Configuration
 MINIO_ACCESS_KEY = "admin"
@@ -52,20 +58,31 @@ def ensure_bucket():
 # Call the function at startup
 ensure_bucket()
 
+# Cache hit/miss tracking
+cache_hits = 0
+cache_misses = 0
+
 def get_temperature_data():
     """
     Fetches temperature data from the openSenseMap API, with caching in Valkey.
     """
+    global cache_hits, cache_misses
     cache_key = "temperature_data"
     
     # Check if data is in Valkey cache
     cached_data = valkey_client.get(cache_key)
     if cached_data:
+        cache_hits += 1
+        CACHE_HIT_RATIO.set(cache_hits / (cache_hits + cache_misses))  # Update cache hit ratio
         try:
             return float(cached_data)  # لو رقم، رجعه مباشرة
         except ValueError:
             return json.loads(cached_data)  # لو JSON، حمّله
+    
     # If no data in cache, fetch from API
+    cache_misses += 1
+    CACHE_HIT_RATIO.set(cache_hits / (cache_hits + cache_misses))  # Update cache hit ratio
+
     response = requests.get(SENSEBOX_API_URL, timeout=30)
     if response.status_code == 200:
         data = response.json()
@@ -126,6 +143,8 @@ def store_data_in_minio():
     """
     Fetch temperature data and store it in MinIO.
     """
+    STORE_REQUESTS_TOTAL.inc()  # Increment store requests metric
+
     data = get_temperature_data()  # جلب البيانات من OpenSenseMap أو الكاش
     if isinstance(data, float):  # في حالة حدوث خطأ أو استرجاع قيمة افتراضية
         data = {"average_temperature": data}
@@ -140,6 +159,7 @@ def store_data_in_minio():
             Body=json.dumps(data),
             ContentType="application/json"
         )
+        STORE_LAST_SUCCESS_TIMESTAMP.set(time.time())  # Update last success timestamp
         print(f"✅ Data stored in MinIO: {file_name}")
     except Exception as e:
         print(f"❌ Error storing data in MinIO: {e}")
@@ -151,7 +171,6 @@ def periodic_store():
         time.sleep(300)  # كل 5 دقائق
 
 # تشغيل التخزين التلقائي في thread منفصل
-
 threading.Thread(target=periodic_store, daemon=True).start()
 
 @app.route('/temperature', methods=['GET'])
