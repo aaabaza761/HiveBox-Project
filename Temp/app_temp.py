@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 import requests
 import json
 import redis
-from flask import Flask, jsonify
+from flask import Flask, jsonify,Response
 from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
 import boto3
 import time
@@ -87,6 +87,7 @@ def get_temperature_data():
     if response.status_code == 200:
         data = response.json()
         valkey_client.setex(cache_key, 300, json.dumps(data))  # Store in Valkey for 300 seconds
+        valkey_client.set("temperature_cache_timestamp", time.time())  # Store cache timestamp
         return data
     
     # If there was an error fetching data, store a default value (float)
@@ -217,6 +218,33 @@ def store_data_now():
     """
     store_data_in_minio()
     return jsonify({"message": "Data stored successfully in MinIO!"}), 200
+
+@app.route('/readyz', methods=['GET'])
+def readiness_probe():
+    """
+    Readiness probe to check service health.
+    """
+    try:
+        data = get_temperature_data()
+        if isinstance(data, float):
+            return Response("Service is degraded, using default data.", status=503)
+
+        total_boxes = len(data)
+        active_boxes = sum(
+            1 for box in data if any(sensor.get('lastMeasurementAt') for sensor in box.get('sensors', []))
+        )
+
+        if total_boxes == 0 or (active_boxes / total_boxes) <= 0.5:
+            return Response("More than 50% of senseBoxes are down!", status=503)
+
+        cache_timestamp = valkey_client.get("temperature_cache_timestamp")
+        if not cache_timestamp or (datetime.now(timezone.utc) - datetime.fromtimestamp(float(cache_timestamp), timezone.utc)) > timedelta(minutes=5):
+            return Response("Cache is outdated!", status=503)
+
+        return Response("OK", status=200)
+
+    except Exception as e:
+        return Response(f"Error checking readiness: {str(e)}", status=503)
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
