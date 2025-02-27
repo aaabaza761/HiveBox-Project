@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 from datetime import datetime, timedelta, timezone
 from Temp.app_temp import calculate_average_temperature, get_temperature_data, app
-
+import redis
 
 class TestTemperatureAPI(unittest.TestCase):
     """Unit tests for temperature-related functionality in the app_temp module."""
