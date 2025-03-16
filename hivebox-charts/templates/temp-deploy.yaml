@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-app
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app: {{ .Values.appLabel }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.appLabel }}
+    spec:
+      automountServiceAccountToken: false  # stop interact Kubernetes API
+      containers:
+      - name: app
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        ports:
+        - containerPort: {{ .Values.appService.port }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-service
+spec:
+  type: {{ .Values.appService.type }}
+  selector:
+    app: {{ .Values.appLabel }}
+  ports:
+  - nodePort: {{ .Values.appService.nodePort }}
+    port: {{ .Values.appService.port }}
+    targetPort: {{ .Values.appService.port }}
+

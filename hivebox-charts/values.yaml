@@ -1,0 +1,31 @@
+replicaCount: 1
+
+appLabel: temp
+
+image:
+  repository: ahmed377/apptemp
+  tag: v7
+
+appService:
+  type: NodePort
+  nodePort: 32000
+  port: 5000
+
+versionApp:
+  name: version
+  image: ahmed377/appversion
+  containerPort: 5001
+  replicas: 1
+
+versionService:
+  type: NodePort
+  nodePort: 30001
+  port: 5001
+  targetPort: 5001
+
+versionIngress:
+  host: "hivebox-version.local"
+
+ingress:
+  host: "hivebox-app.local"
+

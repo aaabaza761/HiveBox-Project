@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-{{ .Values.versionApp.name }}
+spec:
+  replicas: {{ .Values.versionApp.replicas }}
+  selector:
+    matchLabels:
+      app: {{ .Values.versionApp.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.versionApp.name }}
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - name: {{ .Values.versionApp.name }}-con
+        image: {{ .Values.versionApp.image }}
+        ports:
+        - containerPort: {{ .Values.versionApp.containerPort }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-{{ .Values.versionApp.name }}-service
+spec:
+  type: {{ .Values.versionService.type }}
+  selector:
+    app: {{ .Values.versionApp.name }}
+  ports:
+  - nodePort: {{ .Values.versionService.nodePort }}
+    port: {{ .Values.versionService.port }}
+    targetPort: {{ .Values.versionService.targetPort }}
+
