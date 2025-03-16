@@ -7,3 +7,9 @@ resources:
 - minio-deploy.yaml
 
 - minio-service.yaml
+
+- valkey-deploy.yaml
+
+- valkey-service.yaml
+
+

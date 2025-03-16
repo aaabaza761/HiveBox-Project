@@ -4,5 +4,13 @@ kind: Kustomization
 
 resources:
 
+- minio-deploy.yaml
+
+- minio-service.yaml
+
+- valkey-deploy.yaml
+
+- valkey-service.yaml
+
 - deploy-ingress-nginx.yaml
 
