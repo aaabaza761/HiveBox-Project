@@ -15,7 +15,7 @@ versionApp:
   name: version
   image: ahmed377/appversion
   containerPort: 5003
-  replicas: 1
+  replicas: 2
 
 versionService:
   type: NodePort
