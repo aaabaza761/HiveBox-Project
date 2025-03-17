@@ -17,6 +17,7 @@ spec:
       containers:
         - name: valkey
           image: valkey/valkey:latest  # الصورة الرسمية من Docker Hub
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 6379
           resources:

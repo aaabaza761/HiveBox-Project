@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: hivebox-app
+  name: hiveboxapp
   namespace: argocd
 spec:
   project: default
@@ -14,7 +14,7 @@ spec:
         - values.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: test-argocd 
+    namespace: test
   syncPolicy:
     automated:
       prune: true

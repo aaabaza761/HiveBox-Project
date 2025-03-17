@@ -19,7 +19,7 @@ versionApp:
 
 versionService:
   type: NodePort
-  nodePort: 30001
+  nodePort: 30002
   port: 5003
   targetPort: 5003
 
