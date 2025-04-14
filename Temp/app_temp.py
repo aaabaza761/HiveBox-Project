@@ -104,24 +104,38 @@ def calculate_average_temperature(data):
     
     for box in data:
         for sensor in box.get('sensors', []):
-            if sensor.get('title') != 'Temperatur':
+            if sensor.get('title').lower() != 'temperatur':
                 continue
-
-            last_measurement_at = sensor.get('lastMeasurementAt')
-            if not last_measurement_at:
+            last_measurement = sensor.get('lastMeasurement')
+            if  last_measurement:
                 continue
-
             try:
+                last_measurement_at=last_measurement["createdAt"]
                 last_measurement_time = datetime.strptime(
                     last_measurement_at, '%Y-%m-%dT%H:%M:%S.%fZ'
                 ).replace(tzinfo=timezone.utc)
             except ValueError:
                 continue
 
-            if now - last_measurement_time > timedelta(hours=1):
+            if now - last_measurement_time > timedelta(hours=5):
                 continue
 
-            temperature = sensor.get('lastMeasurement')
+            temperature = last_measurement["value"]  
+    #         last_measurement_at = sensor.get('lastMeasurementAt')
+    #         if not last_measurement_at:
+    #             continue
+
+    #         try:
+    #             last_measurement_time = datetime.strptime(
+    #                 last_measurement_at, '%Y-%m-%dT%H:%M:%S.%fZ'
+    #             ).replace(tzinfo=timezone.utc)
+    #         except ValueError:
+    #             continue
+
+    #         if now - last_measurement_time > timedelta(hours=1):
+    #             continue
+
+    #         temperature = sensor.get('lastMeasurement')
             if temperature:
                 valid_temperatures.append(float(temperature))
 
