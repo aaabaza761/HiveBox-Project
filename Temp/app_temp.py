@@ -1,43 +1,52 @@
-"""
-Flask application to serve temperature data with Prometheus metrics and Valkey caching.
-"""
-
-from datetime import datetime, timedelta, timezone
-import requests
-import json
-import redis
 from flask import Flask, jsonify,Response
-from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST
-import boto3
+import requests
+from datetime import datetime, timedelta, timezone
+from prometheus_client import Counter, Gauge, generate_latest, CONTENT_TYPE_LATEST,Histogram
 import time
-import threading
+import redis,boto3
+import os
+import threading,json
+
+
+
 
 app = Flask(__name__)
 
-# OpenSenseMap API URL
-SENSEBOX_API_URL = "https://api.opensensemap.org/boxes"
 
-# Connect to Valkey (running in the Kubernetes cluster)
-valkey_client = redis.Redis(host="valkey-service", port=6379, decode_responses=True)
-
-# Prometheus Metrics
-REQUEST_COUNT = Counter('temperature_requests_total', 'Total number of temperature requests')
-TEMPERATURE_GAUGE = Gauge('average_temperature', 'Average temperature over the last hour')
-
-# New Metrics
-STORE_REQUESTS_TOTAL = Counter('store_requests_total', 'Total number of store requests')
-CACHE_HIT_RATIO = Gauge('cache_hit_ratio', 'Ratio of cache hits to total requests')
-STORE_LAST_SUCCESS_TIMESTAMP = Gauge(
-    'store_last_success_timestamp', 'Timestamp of last successful store in MinIO'
+# ================== Prometheus Metrics ==================
+# عدد الطلبات لكل endpoint
+REQUEST_COUNTER = Counter(
+    'flask_app_requests_total',
+    'Total number of requests',
+    ['method', 'endpoint']
 )
 
+# وقت الاستجابة لكل endpoint
+REQUEST_LATENCY = Histogram(
+    'flask_app_request_latency_seconds',
+    'Latency of requests in seconds',
+    ['method', 'endpoint']
+)
+
+CACHE_HIT_RATIO = Gauge('cache_hit_ratio', 'Ratio of cache hits to total requests')
+STORE_REQUESTS_TOTAL = Counter('store_requests_total', 'Total number of store requests')
+
+
+
+# ================== connect the valkey(cashe layer) ======
+
+valkey_client=redis.Redis(host="valkey-service", port=6379, decode_responses=True)
+
+
 # MinIO Configuration
+
 MINIO_ACCESS_KEY = "admin"
 MINIO_SECRET_KEY = "password"
 MINIO_ENDPOINT = "http://minio-service:9000"
 MINIO_BUCKET_NAME = "hivebox-storage"
 
-# Create MinIO client
+# ================== connect the minIO(Storage layer) ======
+
 minio_client = boto3.client(
     "s3",
     endpoint_url=MINIO_ENDPOINT,
@@ -58,90 +67,54 @@ def ensure_bucket():
 # Call the function at startup
 ensure_bucket()
 
-# Cache hit/miss tracking
-cache_hits = 0
-cache_misses = 0
+# ================== Utility Functions ====================
 
-def get_temperature_data():
-    """
-    Fetches temperature data from the openSenseMap API, with caching in Valkey.
-    """
-    global cache_hits, cache_misses
-    cache_key = "temperature_data"
-    
-    # Check if data is in Valkey cache
-    cached_data = valkey_client.get(cache_key)
-    if cached_data:
-        cache_hits += 1
-        CACHE_HIT_RATIO.set(cache_hits / (cache_hits + cache_misses))  # Update cache hit ratio
-        try:
-            return float(cached_data)  # لو رقم، رجعه مباشرة
-        except ValueError:
-            return json.loads(cached_data)  # لو JSON، حمّله
-    
-    # If no data in cache, fetch from API
-    cache_misses += 1
-    CACHE_HIT_RATIO.set(cache_hits / (cache_hits + cache_misses))  # Update cache hit ratio
+def build_urls_from_ids(boxes_id):
+    return [f"https://api.opensensemap.org/boxes/{box_id}?format=json" for box_id in boxes_id]
 
-    response = requests.get(SENSEBOX_API_URL, timeout=30)
-    if response.status_code == 200:
-        data = response.json()
-        valkey_client.setex(cache_key, 300, json.dumps(data))  # Store in Valkey for 300 seconds
-        valkey_client.set("temperature_cache_timestamp", time.time())  # Store cache timestamp
-        return data
-    
-    # If there was an error fetching data, store a default value (float)
-    default_data = "50.0"
-    valkey_client.setex(cache_key, 300, default_data)  # Store default value in Valkey
-    return float(default_data)
+def fetch_box_data(url):
+    try:
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException:
+        return None
 
-def calculate_average_temperature(data):
-    """
-    Calculates the average temperature from the given data for the last hour.
-    """
+def extract_temperature_from_box(data):
+    if not data:
+        return None
+    
     now = datetime.now(timezone.utc)
-    valid_temperatures = []
-    
-    for box in data:
-        for sensor in box.get('sensors', []):
-            if sensor.get('title').lower() != 'temperatur':
-                continue
-            last_measurement = sensor.get('lastMeasurement')
-            if  last_measurement:
-                continue
-            try:
-                last_measurement_at=last_measurement["createdAt"]
-                last_measurement_time = datetime.strptime(
-                    last_measurement_at, '%Y-%m-%dT%H:%M:%S.%fZ'
-                ).replace(tzinfo=timezone.utc)
-            except ValueError:
-                continue
+    one_hour_ago = now -  timedelta(hours=1)
 
-            if now - last_measurement_time > timedelta(hours=5):
-                continue
-
-            temperature = last_measurement["value"]  
-    #         last_measurement_at = sensor.get('lastMeasurementAt')
-    #         if not last_measurement_at:
-    #             continue
-
-    #         try:
-    #             last_measurement_time = datetime.strptime(
-    #                 last_measurement_at, '%Y-%m-%dT%H:%M:%S.%fZ'
-    #             ).replace(tzinfo=timezone.utc)
-    #         except ValueError:
-    #             continue
-
-    #         if now - last_measurement_time > timedelta(hours=1):
-    #             continue
-
-    #         temperature = sensor.get('lastMeasurement')
-            if temperature:
-                valid_temperatures.append(float(temperature))
-
-    if valid_temperatures:
-        return sum(valid_temperatures) / len(valid_temperatures)
+    for sensor in data.get("sensors", []):
+        if sensor.get("title").lower() == "temperature" or sensor.get("title").lower() == "temperatur" :
+            last = sensor.get("lastMeasurement")
+            if last:
+                try:
+                    created_at = datetime.fromisoformat(last["createdAt"].replace("Z", "+00:00"))
+                    if created_at >= one_hour_ago:
+                        return float(last["value"])
+                except Exception:
+                    return None
     return None
+
+def get_temperature_last_hour():
+    boxes_id =["5d8b36c15f3de0001abe60ea",
+                "5d653fe8953683001a901323",
+                "66506c7d96a6830008c33955",
+                "67371eb8a5dfb4000700bda3"]
+
+    urls = build_urls_from_ids(boxes_id)
+    temperatures = []
+
+    for url in urls:
+        box_data = fetch_box_data(url)
+        temp = extract_temperature_from_box(box_data)
+        if temp is not None:
+            temperatures.append(temp)
+
+    return temperatures
 
 def determine_status(temperature):
     """
@@ -153,17 +126,18 @@ def determine_status(temperature):
         return "Good"
     else:
         return "Too Hot"
-
 def store_data_in_minio():
     """
     Fetch temperature data and store it in MinIO.
     """
     STORE_REQUESTS_TOTAL.inc()  # Increment store requests metric
-
-    data = get_temperature_data()  # جلب البيانات من OpenSenseMap أو الكاش
-    if isinstance(data, float):  # في حالة حدوث خطأ أو استرجاع قيمة افتراضية
-        data = {"average_temperature": data}
-
+    temps = get_temperature_last_hour()
+    average = sum(temps) / len(temps)
+    status=determine_status(average)
+    data = {
+        "Average": average,
+        "status": status
+    }
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     file_name = f"temperature_{timestamp}.json"
     
@@ -174,7 +148,6 @@ def store_data_in_minio():
             Body=json.dumps(data),
             ContentType="application/json"
         )
-        STORE_LAST_SUCCESS_TIMESTAMP.set(time.time())  # Update last success timestamp
         print(f"✅ Data stored in MinIO: {file_name}")
     except Exception as e:
         print(f"❌ Error storing data in MinIO: {e}")
@@ -187,43 +160,68 @@ def periodic_store():
 
 # تشغيل التخزين التلقائي في thread منفصل
 threading.Thread(target=periodic_store, daemon=True).start()
+    
 
-@app.route('/temperature', methods=['GET'])
-def get_temperature():
-    """
-    Handles the /temperature endpoint and returns the average temperature with status.
-    """
-    REQUEST_COUNT.inc()  # Increment request count metric
-    data = get_temperature_data()
 
-    # لو رجعلي float ده معناه إن فيه مشكلة، فبرجعه مباشرة بدون أي معالجة
-    if isinstance(data, (float, int)):
-        TEMPERATURE_GAUGE.set(data)  # Update Prometheus metric
+# Cache hit/miss tracking
+cache_hits = 0
+cache_misses = 0
+
+# ================== Flask Route ===================
+
+@app.route("/temperature", methods=["GET"])
+def get_average_temperature():
+    global cache_hits, cache_misses  # Declare the variables as global
+    
+    start_time = time.time()
+    REQUEST_COUNTER.labels(method='GET', endpoint='/temperature/average').inc()
+    #return data from cash
+    cache_key = "average_temperature"
+    cached_data = valkey_client.get(cache_key)
+    if cached_data:
+        cache_hits+=1
+        CACHE_HIT_RATIO.set(cache_hits / (cache_hits + cache_misses))  # Update cache hit ratio
+        latency = time.time() - start_time
+        REQUEST_LATENCY.labels(method='GET', endpoint='/temperature/average').observe(latency)
+        average = float(cached_data)
+        status = determine_status(average)
         return jsonify({
-            "average_temperature": data,
-            "status": determine_status(data)
-        })
-
-    # Otherwise, process the data normally
-    average_temperature = calculate_average_temperature(data)
-
-    # Handle case where no valid temperature is found
-    if average_temperature is None:
-        average_temperature = 20.0  # Default value
-
-    TEMPERATURE_GAUGE.set(average_temperature)  # Update Prometheus metric
-
+            "Average": round(average, 2),
+            "Status": status,
+            "source": "cache"
+        }), 200
+    
+    # If no data in cache, fetch from API
+    cache_misses += 1
+    temps = get_temperature_last_hour()
+    if not temps:
+        latency = time.time() - start_time
+        REQUEST_LATENCY.labels(method='GET', endpoint='/temperature/average').observe(latency)
+        return jsonify({
+            "message": "No temperature data found in the last hour.",
+            "temperatures": [],
+            "average": None
+        }), 200
+    
+    average = sum(temps) / len(temps)
+    status=determine_status(average)
+    latency = time.time() - start_time
+    REQUEST_LATENCY.labels(method='GET', endpoint='/temperature/average').observe(latency)
+    CACHE_HIT_RATIO.set(cache_hits / (cache_hits + cache_misses))  # Update cache hit ratio
+         
+    # store in cash for 5 minutes(300 sec)
+    valkey_client.setex(cache_key, 300, str(average))
+    valkey_client.set("temperature_cache_timestamp", time.time())  # Store cache timestamp
+    
     return jsonify({
-        "average_temperature": average_temperature,
-        "status": determine_status(average_temperature)
-    })
+        "Average": round(average, 2),
+        "Status": status,
+        "source": "live"
+        }), 200
 
-@app.route('/metrics', methods=['GET'])
+@app.route("/metrics")
 def metrics():
-    """
-    Exposes Prometheus metrics.
-    """
-    return generate_latest(), 200, {'Content-Type': CONTENT_TYPE_LATEST}
+    return Response(generate_latest(), mimetype=CONTENT_TYPE_LATEST)
 
 @app.route('/store', methods=['POST'])
 def store_data_now():
@@ -233,24 +231,24 @@ def store_data_now():
     store_data_in_minio()
     return jsonify({"message": "Data stored successfully in MinIO!"}), 200
 
-@app.route('/readyz', methods=['GET'])
-def readiness_probe():
-    """
-    Readiness probe to check service health.
-    """
+# ================== /readyz Endpoint ===================
+@app.route("/readyz", methods=["GET"])
+def readyz():
+    # Check if the senseBoxes are accessible
+    boxes_id =["5d8b36c15f3de0001abe60ea",
+                "5d653fe8953683001a901323",
+                "66506c7d96a6830008c33955",
+                "67371eb8a5dfb4000700bda3"]
+    accessible_boxes = 0
     try:
-        data = get_temperature_data()
-        if isinstance(data, float):
-            return Response("Service is degraded, using default data.", status=503)
+        for box_id in boxes_id:
+            url = f"https://api.opensensemap.org/boxes/{box_id}?format=json"
+            if fetch_box_data(url):
+                accessible_boxes += 1
 
-        total_boxes = len(data)
-        active_boxes = sum(
-            1 for box in data if any(sensor.get('lastMeasurementAt') for sensor in box.get('sensors', []))
-        )
-
-        if total_boxes == 0 or (active_boxes / total_boxes) <= 0.5:
-            return Response("More than 50% of senseBoxes are down!", status=503)
-
+        # Check if 50% + 1 of the senseBoxes are accessible
+        if accessible_boxes < (len(boxes_id) // 2) + 1:
+            return jsonify({"status": "unhealthy", "reason": "Not enough senseBoxes accessible"}), 503
         cache_timestamp = valkey_client.get("temperature_cache_timestamp")
         if not cache_timestamp or (datetime.now(timezone.utc) - datetime.fromtimestamp(float(cache_timestamp), timezone.utc)) > timedelta(minutes=5):
             return Response("Cache is outdated!", status=503)
@@ -260,5 +258,8 @@ def readiness_probe():
     except Exception as e:
         return Response(f"Error checking readiness: {str(e)}", status=503)
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+
+# ================== Run App ===================
+
+if __name__ == "__main__":
+    app.run(debug=True,host="0.0.0.0",port=5000)

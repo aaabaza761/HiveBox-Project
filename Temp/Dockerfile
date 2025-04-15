@@ -8,18 +8,16 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Ensure requirements.txt has pinned versions before installing
-RUN python -m pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the rest of the application code
 COPY . .
 
-# Set environment variables for security and clarity
+#Set environment variables for security and clarity
 ENV FLASK_APP=app_temp.py
 ENV FLASK_RUN_HOST=0.0.0.0
 ENV FLASK_RUN_PORT=5000
 
-# Expose the port the app will run on
 EXPOSE 5000
-
-# Define the command to run the app
 CMD ["flask", "run"]
+
