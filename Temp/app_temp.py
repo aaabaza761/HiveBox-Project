@@ -258,6 +258,13 @@ def readyz():
     except Exception as e:
         return Response(f"Error checking readiness: {str(e)}", status=503)
 
+@app.route('/version', methods=['GET'])
+def version():
+    """
+    Handles the /version endpoint and returns the current application version.
+    """
+    app_version = {"Version": "5.0.0"}
+    return jsonify(app_version)
 
 # ================== Run App ===================
 

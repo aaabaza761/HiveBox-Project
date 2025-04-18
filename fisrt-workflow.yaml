@@ -73,16 +73,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # Check out the repository code
-      - name: Checkout code
-        uses: actions/checkout@v3
-
-      # Debug: Verify secrets loaded (SAFE)
-      - name: Verify secrets loaded
-        run: |
-          echo "DockerHub username: ${DOCKER_USERNAME:0:2}***"
-        env:
-          DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+      
 
       # Log in to DockerHub
       - name: Log in to DockerHub

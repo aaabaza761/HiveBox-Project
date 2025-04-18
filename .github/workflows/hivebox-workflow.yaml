@@ -1,0 +1,54 @@
+name: CI Pipeline
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      #checkout the code
+      - name: checkout the code ( clone on server ubuntu )
+        uses: actions/checkout@v4
+      
+      #Lint the Dockerfile
+      - name: lint Dockerfile in Temp
+        uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: Temp/Dockerfile
+      
+      # RUN Ready Pylint action 
+      - name: use pylint to check code
+        uses: ricardochaves/python-lint@v1.4.0
+        with:
+          python-root-list: "Temp Version tests"
+          use-pylint: true
+          extra-pylint-options: "--exit-zero"
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      #checkout the code
+      - uses: actions/checkout@v4
+      
+      #set-up pyhon
+      - name: set-up python environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13' 
+      
+      #install dependencies
+      - name: install dependencies
+        run: pip install -r Temp/requirements.txt
+             
+      
+      #run test
+      - name: run unt tests
+        run: python -m unittest discover -s tests -p "test_*.py"
+
+             
+    
