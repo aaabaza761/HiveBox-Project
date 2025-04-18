@@ -71,3 +71,20 @@ jobs:
           repoOwner: ${{ secrets.DOCKER_USERNAME }}
           repository:  apptemp
           tag: 11
+  
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout of code
+        uses: actions/checkout@v3
+
+      - name: run Openssf Scorecard
+        uses: ossf/scorecard-action@v2.4.0
+        with:
+          results_file: results.json
+      
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: Scorecard results
+          path: results.json
