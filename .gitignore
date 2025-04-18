@@ -1,3 +1,12 @@
 __pycache__/
-*.pyc
 challenges.txt
+# Ignore binary files
+*.exe
+*.dll
+*.so
+*.pyc
+*.class
+nohub.out
+first-workflow.yaml
+Temp/update_app_temp.py
+x
