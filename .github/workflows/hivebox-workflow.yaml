@@ -57,14 +57,17 @@ jobs:
       #checkout the code
       - name: checkout the code
         uses: actions/checkout@v4
+      - name: List project files
+        run: ls -R
+      
       #build, tag using secrets credentialon Dockerhub and push the image 
       - name: Build, Tag & Publish Image to DockerHub
         uses: dinushchathurya/build-tag-push-action@v1.2.1
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
-          context: ./Temp
-          file: Dockerfile
+          context: Temp
+          file: Temp/Dockerfile
           repoOwner: ${{ secrets.DOCKER_USERNAME }}
           repository:  apptemp
           tag: 11
