@@ -6,7 +6,7 @@ challenges.txt
 *.so
 *.pyc
 *.class
-nohub.out
-first-workflow.yaml
+nohup.out
+fisrt-workflow.yaml
 Temp/update_app_temp.py
 x
