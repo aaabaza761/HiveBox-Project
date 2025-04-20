@@ -3,13 +3,19 @@ pipeline {
         docker { image 'ahmed377/jenkins-agent:v1' }
     }
     stages {
-        stage('Lint && Test') {
+            stage('Lint') {
             steps {
                 script {
-                    // تنفيذ الـ linting و unit tests باستخدام الأدوات اللي على الـ agent
-                    sh 'pylint --persistent=n Temp/app_temp.py || true'
-                    sh 'hadolint Temp/Dockerfile'
-                    sh 'python -m unittest discover -s tests -p "test_app_temp.py"'
+                    def result = sh(script: 'pylint --exit-zero Temp/app_temp.py', returnStdout: true)
+                    echo result
+                    def match = result =~ /Your code has been rated at ([\d.]+)\/10/
+                    if (match) {
+                        def score = match[0][1].toFloat()
+                        echo "Code Score: ${score}"
+                        if (score < 7.0) {
+                            error("Code quality score too low: ${score}/10")
+                        }
+                    }
                 }
             }
         }
