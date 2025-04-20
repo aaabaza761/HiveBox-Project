@@ -3,7 +3,7 @@ pipeline {
         docker { image 'ahmed377/jenkins-agent:v1' }
     }
     stages {
-            stage('Lint') {
+            stage('Lint the code') {
             steps {
                 script {
                     def result = sh(script: 'pylint --exit-zero Temp/app_temp.py', returnStdout: true)
@@ -19,5 +19,17 @@ pipeline {
                 }
             }
         }
+            
+            stage('lint the Dockerfile'){
+                steps{
+                    sh 'hadolint Temp/Dockerfile'
+                }
+            }
+            
+            stage('Run Unit Tests'){
+                steps{
+                    sh 'python -m unittest discover -s tests -p "text_app_temp.py"'
+                }
+            }
     }
 }
