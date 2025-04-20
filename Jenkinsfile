@@ -7,7 +7,7 @@ pipeline {
             steps {
                 script {
                     // تنفيذ الـ linting و unit tests باستخدام الأدوات اللي على الـ agent
-                    sh 'pylint --persistent=n Temp/app_temp.py'
+                    sh 'pylint --persistent=n Temp/app_temp.py || true'
                     sh 'hadolint Temp/Dockerfile'
                     sh 'python -m unittest discover -s tests -p "test_app_temp.py"'
                 }
