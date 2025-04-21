@@ -2,7 +2,7 @@ pipeline {
     agent {
         docker {
              image 'ahmed377/jenkins-agent:v1' 
-             args '-v /var/run/docker.sock:/var/run/docker.sock -v /usr/bin/docker:/usr/bin/docker'
+             args '-v /var/run/docker.sock:/var/run/docker.sock -v /usr/bin/docker:/usr/bin/docker -v $HOME/.docker:/root/.docker'
         }
     }
 
@@ -54,17 +54,18 @@ pipeline {
             }
         }
 
-            stage('Push Docker Image'){
-                steps{
-                     script {
-                    sh """
-                    echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
-                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                    docker push ${IMAGE_NAME}:latest
-                    """
-                }
+            stage('Push Docker Image') {
+                steps {
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    sh '''
+                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                        docker push ${IMAGE_NAME}:latest
+                        
+                    '''
+        }
+    }
+}
 
-                }
-            }
     }
 }
