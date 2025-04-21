@@ -5,6 +5,13 @@ pipeline {
              args '-v /var/run/docker.sock:/var/run/docker.sock -v /usr/bin/docker:/usr/bin/docker'
         }
     }
+
+    environment{
+            DOCKERHUB_CREDENTIALS = credentials('dockerhub') // Create in Jenkins credentials
+            IMAGE_NAME = 'ahmed377/apptemp'
+            IMAGE_TAG = 'V12'
+
+    }
     stages {
             stage('Lint the code') {
             steps {
@@ -39,11 +46,25 @@ pipeline {
                     sh 'python -m unittest discover -s tests -p "text_app_temp.py"'
                 }
             }
-            stage('Check Docker') {
+            stage('Build Docker Image') {
             steps {
-                sh 'docker version'
-                sh 'docker ps'
+                sh 'docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f Temp/Dockerfile .'
+                sh 'docker tag ${IMAGE_NAME}:${IMAGE_TAG} ${IMAGE_NAME}:latest'
+                sh 'docker images'
             }
         }
+
+            stage('Push Docker Image'){
+                steps{
+                     script {
+                    sh """
+                    echo "${DOCKERHUB_CREDENTIALS_PSW}" | docker login -u "${DOCKERHUB_CREDENTIALS_USR}" --password-stdin
+                    docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                    docker push ${IMAGE_NAME}:latest
+                    """
+                }
+
+                }
+            }
     }
 }
