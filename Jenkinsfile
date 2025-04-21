@@ -58,9 +58,10 @@ pipeline {
                 steps {
                     withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
                     sh '''
-                        echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-                        docker push ${IMAGE_NAME}:${IMAGE_TAG}
-                        docker push ${IMAGE_NAME}:latest
+                        mkdir -p /tmp/.docker
+                        echo "$DOCKER_PASS" | docker --config /tmp/.docker login -u "$DOCKER_USER" --password-stdin
+                        docker --config /tmp/.docker push ${IMAGE_NAME}:${IMAGE_TAG}
+                        docker --config /tmp/.docker push ${IMAGE_NAME}:latest
                         
                     '''
         }
