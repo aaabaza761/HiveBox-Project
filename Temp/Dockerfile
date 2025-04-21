@@ -5,7 +5,7 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Copy only the files needed for installation first (for caching)
-COPY requirements.txt .
+COPY Temp/requirements.txt .
 
 # Ensure requirements.txt has pinned versions before installing
 RUN pip install --no-cache-dir -r requirements.txt
